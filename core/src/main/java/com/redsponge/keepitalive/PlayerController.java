@@ -2,18 +2,27 @@ package com.redsponge.keepitalive;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
-import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.glutils.FrameBuffer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.Disposable;
+import com.badlogic.gdx.utils.Scaling;
+import com.badlogic.gdx.utils.viewport.FitViewport;
+import com.badlogic.gdx.utils.viewport.ScalingViewport;
+import com.badlogic.gdx.utils.viewport.Viewport;
+import com.redsponge.redengine.screen.INotified;
 import com.redsponge.redengine.screen.components.Mappers;
 import com.redsponge.redengine.screen.components.PositionComponent;
 import com.redsponge.redengine.screen.components.SizeComponent;
 import com.redsponge.redengine.screen.components.VelocityComponent;
 import com.redsponge.redengine.utils.Logger;
 
-public class PlayerController {
+public class PlayerController implements INotified, Disposable {
 
     private Human controlled;
     private VelocityComponent vel;
@@ -28,10 +37,31 @@ public class PlayerController {
     private Vector2 controlledCenter;
     private Vector2 tmp;
     private int currentInterestingTarget;
+    private boolean isControllingDoctor;
+    private boolean isChoosingForTakeover;
+
+    private final TextureRegion syringe;
+    private final FrameBuffer syringeArea;
+    private final TextureRegion syringeAreaRegion;
+    private final Pixmap syringeMask;
+
+    private ScalingViewport syringeViewport;
+
+    private FitViewport guiViewport;
 
     public PlayerController(GameScreen screen) {
         this.screen = screen;
         targets = new Array<>();
+        syringeArea = new FrameBuffer(Pixmap.Format.RGBA8888, 16 * 3, 16, false);
+        syringeMask = new Pixmap(16 * 3, 16, Pixmap.Format.RGBA8888);
+
+        syringeViewport = new ScalingViewport(Scaling.fill, 16 * 3, 16);
+        syringeAreaRegion = new TextureRegion(syringeArea.getColorBufferTexture());
+        syringeAreaRegion.flip(false, true);
+        syringeArea.getColorBufferTexture().setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+
+        syringe = new TextureRegion(screen.getAssets().get("syringe", Texture.class));
+        guiViewport = new FitViewport(screen.getScreenWidth(), screen.getScreenHeight());
     }
 
     public void setControlled(Human controlled) {
@@ -40,6 +70,7 @@ public class PlayerController {
             this.controlled.virusLeft();
         }
         this.controlled = controlled;
+        this.isControllingDoctor = controlled instanceof Doctor;
         this.controlled.setControlled(true);
         this.vel = Mappers.velocity.get(controlled);
         this.pos = Mappers.position.get(controlled);
@@ -49,11 +80,22 @@ public class PlayerController {
         this.tmp = new Vector2();
     }
 
+    @Override
+    public void notified(Object o, int i) {
+        if(i == Notifications.CONTROLLED_HEALED) {
+            if(o == controlled) {
+                screen.notified(this, Notifications.LOST);
+            }
+        }
+    }
+
     public void tick(float delta) {
         if(controlled.isDead()) {
+            Logger.log(this, "CONTROLLED DEAD :(");
             screen.notified(this, Notifications.LOST);
             return;
         }
+
 
         if (isChoosingTargets) {
             vel.set(0, 0);
@@ -65,15 +107,29 @@ public class PlayerController {
             if(currentInterestingTarget < 0) {
                 currentInterestingTarget = targets.size - 1;
             }
-            if (Gdx.input.isKeyJustPressed(Input.Keys.Z)) {
-                setControlled(targets.get(currentInterestingTarget));
-                releaseTargets();
+            if(isChoosingForTakeover) {
+                if (Gdx.input.isKeyJustPressed(Input.Keys.Z)) {
+                    if (targets.get(currentInterestingTarget).isProtected()) {
+                        screen.notified(this, Notifications.LOST);
+                        return;
+                    }
+
+                    setControlled(targets.get(currentInterestingTarget));
+                    releaseTargets();
+                }
+            } else {
+                if (isControllingDoctor && Gdx.input.isKeyJustPressed(Input.Keys.X)) {
+                    targets.get(currentInterestingTarget).injectBad();
+                    ((Doctor)controlled).syringes--;
+                    releaseTargets();
+                } else if(!isControllingDoctor) {
+                    releaseTargets();
+                }
             }
             if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
                 releaseTargets();
             }
         } else {
-
             int horiz = (Gdx.input.isKeyPressed(Input.Keys.RIGHT) ? 1 : 0) - (Gdx.input.isKeyPressed(Input.Keys.LEFT) ? 1 : 0);
             int vert = (Gdx.input.isKeyPressed(Input.Keys.UP) ? 1 : 0) - (Gdx.input.isKeyPressed(Input.Keys.DOWN) ? 1 : 0);
 
@@ -81,8 +137,26 @@ public class PlayerController {
             this.vel.setY(vert * speed);
 
             if (Gdx.input.isKeyJustPressed(Input.Keys.Z)) {
-                generateTargets();
+                generateTargets(false);
+                isChoosingForTakeover = true;
+            } else if(isControllingDoctor && Gdx.input.isKeyJustPressed(Input.Keys.X) && ((Doctor)controlled).syringes >= 1) {
+                generateTargets(true);
+                isChoosingForTakeover = false;
             }
+        }
+        if(pos.getX() + vel.getX() * delta < 0) {
+            pos.setX(0);
+            vel.setX(0);
+        } else if(pos.getX() + vel.getX() * delta + size.getX() > screen.getGameWidth()) {
+            pos.setX(screen.getGameWidth() - size.getX());
+            vel.setX(0);
+        }
+        if(pos.getY() + vel.getY() * delta < 0) {
+            pos.setY(0);
+            vel.setY(0);
+        } else if(pos.getY() + vel.getY() * delta + size.getY() > screen.getGameHeight()) {
+            pos.setY(screen.getGameHeight() - size.getY());
+            vel.setY(0);
         }
     }
 
@@ -91,8 +165,53 @@ public class PlayerController {
         targets.clear();
     }
 
+    private void renderSyringes(SpriteBatch batch) {
+        syringeViewport.apply(true);
+        batch.setProjectionMatrix(syringeViewport.getCamera().combined);
+        syringeArea.begin();
+        Gdx.gl.glClearColor(0, 0, 0, 0);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
+        syringeMask.setColor(0, 0, 0, 0.5f);
+        syringeMask.fill();
+        float tmp = ((Doctor)controlled).syringes;
+        batch.begin();
+        int i = 0;
+        for (int j = 0; j < 3; j++) {
+            batch.setColor(Color.GREEN);
+            batch.draw(syringe, j * 16, 0, 16, 16);
+        }
+        while(tmp > 0) {
+            syringeMask.setColor(1, 1, 1, 1);
+            syringeMask.fillRectangle(i * 16, 0, 16, (int) (syringeMask.getHeight() * (tmp >= 1 ? 1 : tmp)));
+
+            tmp--;
+            i++;
+        }
+        TextureRegion reg = new TextureRegion(new Texture(syringeMask));
+        reg.flip(false, true);
+
+//        batch.enableBlending();
+        batch.setBlendFunction(GL20.GL_ZERO, GL20.GL_SRC_ALPHA);
+        batch.draw(reg, 0, 0, syringeArea.getWidth(), syringeArea.getHeight());
+        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        batch.end();
+
+        syringeArea.end();
+        screen.getGUIViewport().apply();
+        batch.setProjectionMatrix(screen.getGUIViewport().getCamera().combined);
+        batch.begin();
+        batch.draw(syringeAreaRegion, 0, 0, 96, 32);
+        batch.end();
+    }
+
     public void render(SpriteBatch batch, ShapeRenderer renderer) {
+        if(isControllingDoctor) {
+            renderSyringes(batch);
+        }
+
         if (!isChoosingTargets) return;
+
         renderer.begin(ShapeRenderer.ShapeType.Line);
         renderer.setColor(Color.RED);
         for (int i = 0; i < targets.size; i++) {
@@ -111,7 +230,7 @@ public class PlayerController {
         renderer.end();
     }
 
-    private void generateTargets() {
+    private void generateTargets(boolean includeProtected) {
         currentInterestingTarget = 0;
         targets.clear();
         isChoosingTargets = true;
@@ -123,13 +242,31 @@ public class PlayerController {
             PositionComponent humanPos = Mappers.position.get(h);
             SizeComponent humanSize = Mappers.size.get(h);
             tmp.set(humanPos.getX() + humanSize.getX() / 2f, humanPos.getY() + humanSize.getY() / 2f);
-            if (tmp.dst2(controlledCenter) < 50 * 50) {
-                targets.add(h);
+            if(includeProtected || !h.isProtected()) {
+                if (tmp.dst2(controlledCenter) < 50 * 50) {
+                    targets.add(h);
+                }
             }
         }
         if (targets.isEmpty()) {
             isChoosingTargets = false;
             Logger.log(this, "Couldn't find any targets!");
         }
+    }
+
+
+
+    @Override
+    public void dispose() {
+        syringeMask.dispose();
+        syringeArea.dispose();
+    }
+
+    public void focusCamera(OrthographicCamera camera) {
+        camera.position.lerp(new Vector3(pos.getX() + size.getX() / 2f, pos.getY() + size.getY() / 2f, 0), 0.1f);
+    }
+
+    public void resize(int width, int height) {
+        guiViewport.update(width, height, true);
     }
 }

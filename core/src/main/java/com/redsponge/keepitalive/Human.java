@@ -12,13 +12,15 @@ import com.redsponge.redengine.utils.Logger;
 
 public class Human extends ScreenEntity {
 
-    private boolean controlled;
-    private IntVector2 wantedPos;
-    private float speed = 40;
+    protected boolean controlled;
+    protected IntVector2 wantedPos;
+    protected float speed = 40;
 
-    private float hp;
+    private boolean isProtected;
+
+    protected float hp;
     private boolean isDead;
-    private float maxHp = 10;
+    protected float maxHp = 10;
 
     public Human(SpriteBatch batch, ShapeRenderer shapeRenderer) {
         super(batch, shapeRenderer);
@@ -34,7 +36,7 @@ public class Human extends ScreenEntity {
         generatePos();
     }
 
-    private void generatePos() {
+    protected void generatePos() {
         wantedPos.set(MathUtils.random(320), MathUtils.random(180));
     }
 
@@ -78,7 +80,10 @@ public class Human extends ScreenEntity {
         batch.end();
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
         shapeRenderer.setColor(Color.YELLOW);
-        shapeRenderer.getColor().lerp(0, 0.5f, 0, 1.0f, 1 - (hp / maxHp));
+        shapeRenderer.getColor().lerp(0, 0.5f, 0, 1.0f, 1 - getHPRatio());
+        if(isProtected) {
+            shapeRenderer.setColor(Color.GOLD);
+        }
         shapeRenderer.rect(pos.getX(), pos.getY(), size.getX(), size.getY());
         shapeRenderer.end();
         batch.begin();
@@ -86,5 +91,49 @@ public class Human extends ScreenEntity {
 
     public boolean isDead() {
         return isDead;
+    }
+
+    public boolean isProtected() {
+        return isProtected;
+    }
+
+    public void setProtected(boolean aProtected) {
+        isProtected = aProtected;
+    }
+
+    public float getHPRatio() {
+        return hp / maxHp;
+    }
+
+    protected float getHP() {
+        return hp;
+    }
+
+    protected void heal() {
+        if(hp == maxHp) {
+            isProtected = true;
+        } else {
+            hp += 3;
+            if(hp > maxHp) {
+                hp = maxHp;
+            }
+        }
+        if(controlled) {
+            notifyScreen(Notifications.CONTROLLED_HEALED);
+        }
+    }
+
+    public void injectBad() {
+        if(isProtected) {
+            isProtected = false;
+        }
+        else {
+            hp -= 3;
+        }
+    }
+
+    @Override
+    public void removed() {
+        ((GameScreen)screen).getHumans().removeValue(this, true);
     }
 }
