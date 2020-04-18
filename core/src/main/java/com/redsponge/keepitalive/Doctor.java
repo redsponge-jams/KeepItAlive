@@ -108,8 +108,8 @@ public class Doctor extends Human {
         shapeRenderer.rect(pos.getX() + 2, pos.getY() + size.getY() - 1, 4, 3);
         shapeRenderer.end();
         batch.begin();
-        batch.setColor(Color.GOLD);
-        for(int i = 1; i < syringes; i++) {
+        batch.setColor(controlled ? Color.GREEN : Color.GOLD);
+        for(int i = 0; i < (int) syringes; i++) {
             batch.draw(syringe, pos.getX() + i * 2, pos.getY() + size.getY() + 2, 8, 8);
         }
         batch.end();

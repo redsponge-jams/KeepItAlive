@@ -41,7 +41,6 @@ public class GameScreen extends AbstractScreen {
         guiViewport = new FitViewport(getScreenWidth(), getScreenHeight());
         humans = new DelayedRemovalArray<>();
         renderSystem = getEntitySystem(RenderSystem.class);
-        renderSystem.getBackground().set(Color.GRAY);
         Human h = new Human(batch, shapeRenderer);
         addHuman(h);
         controller = new PlayerController(this);
@@ -82,6 +81,9 @@ public class GameScreen extends AbstractScreen {
     public void tick(float v) {
         if(!transitioning) {
             controller.tick(v);
+        }
+        if(controller.isChoosingTarget()) {
+            v /= 5f;
         }
         shapeRenderer.setProjectionMatrix(renderSystem.getCamera().combined);
         controller.focusCamera(renderSystem.getCamera());

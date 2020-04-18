@@ -20,7 +20,7 @@ public class Background extends ScreenEntity {
     private void render() {
         batch.end();
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(0, 0, 0,1);
+        shapeRenderer.setColor(Color.GRAY);
         shapeRenderer.rect(0, 0, 10000, 10000);
         shapeRenderer.end();
         batch.begin();

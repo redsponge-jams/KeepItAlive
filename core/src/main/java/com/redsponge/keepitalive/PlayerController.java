@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.FrameBuffer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Array;
@@ -14,13 +15,14 @@ import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.Scaling;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.ScalingViewport;
-import com.badlogic.gdx.utils.viewport.Viewport;
 import com.redsponge.redengine.screen.INotified;
 import com.redsponge.redengine.screen.components.Mappers;
 import com.redsponge.redengine.screen.components.PositionComponent;
 import com.redsponge.redengine.screen.components.SizeComponent;
 import com.redsponge.redengine.screen.components.VelocityComponent;
+import com.redsponge.redengine.utils.GeneralUtils;
 import com.redsponge.redengine.utils.Logger;
+import com.redsponge.redengine.utils.MathUtilities;
 
 public class PlayerController implements INotified, Disposable {
 
@@ -48,6 +50,7 @@ public class PlayerController implements INotified, Disposable {
     private ScalingViewport syringeViewport;
 
     private FitViewport guiViewport;
+    private float checkRadius;
 
     public PlayerController(GameScreen screen) {
         this.screen = screen;
@@ -98,7 +101,9 @@ public class PlayerController implements INotified, Disposable {
 
 
         if (isChoosingTargets) {
+            checkRadius = MathUtilities.lerp(checkRadius, 50, 0.1f);
             vel.set(0, 0);
+            generateTargets(!isChoosingForTakeover);
             int horiz = (Gdx.input.isKeyJustPressed(Input.Keys.RIGHT) ? 1 : 0) - (Gdx.input.isKeyJustPressed(Input.Keys.LEFT) ? 1 : 0);
             currentInterestingTarget += horiz;
             if(currentInterestingTarget >= targets.size) {
@@ -108,28 +113,32 @@ public class PlayerController implements INotified, Disposable {
                 currentInterestingTarget = targets.size - 1;
             }
             if(isChoosingForTakeover) {
-                if (Gdx.input.isKeyJustPressed(Input.Keys.Z)) {
-                    if (targets.get(currentInterestingTarget).isProtected()) {
-                        screen.notified(this, Notifications.LOST);
-                        return;
-                    }
+                if (!Gdx.input.isKeyPressed(Input.Keys.Z)) {
+                    if (targets.size > 0) {
+                        if (targets.get(currentInterestingTarget).isProtected()) {
+                            screen.notified(this, Notifications.LOST);
+                            return;
+                        }
 
-                    setControlled(targets.get(currentInterestingTarget));
-                    releaseTargets();
+                        setControlled(targets.get(currentInterestingTarget));
+                        releaseTargets();
+                    }
                 }
             } else {
-                if (isControllingDoctor && Gdx.input.isKeyJustPressed(Input.Keys.X)) {
+                if (isControllingDoctor && !Gdx.input.isKeyPressed(Input.Keys.X)) {
                     targets.get(currentInterestingTarget).injectBad();
                     ((Doctor)controlled).syringes--;
                     releaseTargets();
                 } else if(!isControllingDoctor) {
                     releaseTargets();
+
                 }
             }
             if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
                 releaseTargets();
             }
         } else {
+            checkRadius = 0;
             int horiz = (Gdx.input.isKeyPressed(Input.Keys.RIGHT) ? 1 : 0) - (Gdx.input.isKeyPressed(Input.Keys.LEFT) ? 1 : 0);
             int vert = (Gdx.input.isKeyPressed(Input.Keys.UP) ? 1 : 0) - (Gdx.input.isKeyPressed(Input.Keys.DOWN) ? 1 : 0);
 
@@ -172,7 +181,7 @@ public class PlayerController implements INotified, Disposable {
         Gdx.gl.glClearColor(0, 0, 0, 0);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        syringeMask.setColor(0, 0, 0, 0.5f);
+        syringeMask.setColor(0, 0, 0, 0.1f);
         syringeMask.fill();
         float tmp = ((Doctor)controlled).syringes;
         batch.begin();
@@ -227,11 +236,11 @@ public class PlayerController implements INotified, Disposable {
                 renderer.set(ShapeRenderer.ShapeType.Line);
             }
         }
+        renderer.circle(pos.getX() + size.getX() / 2f, pos.getY() + size.getY() / 2f, checkRadius);
         renderer.end();
     }
 
     private void generateTargets(boolean includeProtected) {
-        currentInterestingTarget = 0;
         targets.clear();
         isChoosingTargets = true;
         controlledCenter.set(pos.getX() + size.getX() / 2f, pos.getY() + size.getY() / 2f);
@@ -243,12 +252,13 @@ public class PlayerController implements INotified, Disposable {
             SizeComponent humanSize = Mappers.size.get(h);
             tmp.set(humanPos.getX() + humanSize.getX() / 2f, humanPos.getY() + humanSize.getY() / 2f);
             if(includeProtected || !h.isProtected()) {
-                if (tmp.dst2(controlledCenter) < 50 * 50) {
+                if (tmp.dst2(controlledCenter) < checkRadius * checkRadius) {
                     targets.add(h);
                 }
             }
         }
-        if (targets.isEmpty()) {
+        targets.sort((h1, h2) -> (int) (Mappers.position.get(h2).getX() - Mappers.position.get(h1).getX()));
+        if (targets.isEmpty() && checkRadius > 40) {
             isChoosingTargets = false;
             Logger.log(this, "Couldn't find any targets!");
         }
@@ -264,9 +274,18 @@ public class PlayerController implements INotified, Disposable {
 
     public void focusCamera(OrthographicCamera camera) {
         camera.position.lerp(new Vector3(pos.getX() + size.getX() / 2f, pos.getY() + size.getY() / 2f, 0), 0.1f);
+        if(isChoosingTargets) {
+            camera.zoom = MathUtilities.lerp(camera.zoom, 0.8f, 0.1f);
+        } else {
+            camera.zoom = MathUtilities.lerp(camera.zoom, 1, 0.1f);
+        }
     }
 
     public void resize(int width, int height) {
         guiViewport.update(width, height, true);
+    }
+
+    public boolean isChoosingTarget() {
+        return isChoosingTargets;
     }
 }

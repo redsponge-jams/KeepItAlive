@@ -110,13 +110,10 @@ public class Human extends ScreenEntity {
     }
 
     protected void heal() {
-        if(hp == maxHp) {
+        hp += 3;
+        if(hp > maxHp) {
+            hp = maxHp;
             isProtected = true;
-        } else {
-            hp += 3;
-            if(hp > maxHp) {
-                hp = maxHp;
-            }
         }
         if(controlled) {
             notifyScreen(Notifications.CONTROLLED_HEALED);
