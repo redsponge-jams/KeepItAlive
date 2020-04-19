@@ -1,9 +1,12 @@
 package com.redsponge.keepitalive;
 
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Interpolation;
 import com.badlogic.gdx.math.MathUtils;
@@ -20,8 +23,11 @@ import com.redsponge.redengine.screen.AbstractScreen;
 import com.redsponge.redengine.screen.components.Mappers;
 import com.redsponge.redengine.screen.components.PositionComponent;
 import com.redsponge.redengine.screen.systems.RenderSystem;
+import com.redsponge.redengine.transitions.Transitions;
 import com.redsponge.redengine.utils.GameAccessor;
 import com.redsponge.redengine.utils.MathUtilities;
+
+import java.sql.Time;
 
 public class GameScreen extends AbstractScreen {
 
@@ -44,6 +50,12 @@ public class GameScreen extends AbstractScreen {
 
     private Texture warnTexture;
     private float deathTime;
+
+    private int deaths;
+    private float timeAlive;
+
+    private TextureRegion humanDeathIcon;
+    private Texture clockIcon;
 
     public GameScreen(GameAccessor ga) {
         super(ga);
@@ -68,6 +80,8 @@ public class GameScreen extends AbstractScreen {
         font = Fonts.getFont("pixelmix", 16);
 
         warnTexture = assets.get("warnTexture", Texture.class);
+        humanDeathIcon = assets.getTextureRegion("humanDead");
+        clockIcon = assets.get("clock", Texture.class);
     }
 
     public void addHuman(Human h) {
@@ -99,22 +113,26 @@ public class GameScreen extends AbstractScreen {
             OrthographicCamera cam = renderSystem.getCamera();
             cam.zoom = MathUtilities.lerp(cam.zoom, 0.5f, 0.1f);
             deathTime += v;
-        } else {
-            if (!transitioning) {
-                if (isMoving) {
-                    moveTime += v * 4;
-                    if (moveTime > 1) {
-                        isMoving = false;
-                        controller.setControlled(moveTo);
-                    } else {
-                        v = 0;
-                    }
-                }
-                controller.tick(v);
+            if(Gdx.input.isKeyJustPressed(Keys.ENTER) && !transitioning) {
+                ga.transitionTo(new GameScreen(ga), Transitions.sineSlide(1, batch, shapeRenderer));
             }
+        } else {
+            if (isMoving) {
+                moveTime += v * 4;
+                if (moveTime > 1) {
+                    isMoving = false;
+                    controller.setControlled(moveTo);
+                } else {
+                    v = 0;
+                }
+            }
+            controller.tick(v);
         }
         if(controller.isChoosingTarget()) {
             v /= 5f;
+        }
+        if(!isDead) {
+            timeAlive += v;
         }
         shapeRenderer.setProjectionMatrix(renderSystem.getCamera().combined);
         controller.focusCamera(renderSystem.getCamera());
@@ -142,8 +160,6 @@ public class GameScreen extends AbstractScreen {
 
     @Override
     public void render() {
-//        Gdx.gl.glClearColor(0, 0, 0, 1);
-//        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         renderEntities();
         controller.render(batch, shapeRenderer);
         if(isMoving) {
@@ -162,16 +178,25 @@ public class GameScreen extends AbstractScreen {
         }
 
 
+        guiViewport.apply();
+        batch.setProjectionMatrix(guiViewport.getCamera().combined);
+        batch.begin();
+
         if(controller.getControlled() != null){
             guiViewport.apply();
-            batch.setProjectionMatrix(guiViewport.getCamera().combined);
-            batch.begin();
             if(controller.getControlled().getHPRatio() < 0.5f) {
                 batch.setColor(1, 1,1, .5f - MathUtils.map(0, 0.5f, 0, .5f, controller.getControlled().getHPRatio()));
                 batch.draw(warnTexture, 0, 0);
             }
-            batch.end();
         }
+        font.getData().setScale(0.5f);
+        batch.setColor(Color.WHITE);
+        batch.draw(humanDeathIcon, 10, guiViewport.getWorldHeight() - 20);
+        font.draw(batch, "" + deaths, 30, guiViewport.getWorldHeight() - 12);
+        batch.draw(clockIcon, guiViewport.getWorldWidth() - 60, guiViewport.getWorldHeight() - 20);
+        String timeFormat = String.format("%02d:%02d", (int) timeAlive / 60, (int) timeAlive % 60);
+        font.draw(batch, timeFormat, guiViewport.getWorldWidth() - 40, guiViewport.getWorldHeight() - 9);
+        batch.end();
 
         if(isDead) {
             ScreenFiller.fillScreen(shapeRenderer, 0, 0, 0, 0.5f);
@@ -208,6 +233,9 @@ public class GameScreen extends AbstractScreen {
             } else if (notification == Notifications.HOST_DIED) {
                 isDead = true;
                 deathCause = DeathCause.HOST_DIED;
+            }
+            if(notification == Notifications.HUMAN_DIED) {
+                deaths++;
             }
         }
     }

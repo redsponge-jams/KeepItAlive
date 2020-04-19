@@ -31,7 +31,7 @@ public class Human extends ScreenEntity {
     private Animation<TextureRegion> protectedAnimation;
 
     private float time;
-    private boolean isFacingLeft;
+    protected boolean isFacingLeft;
     private TextureRegion deathFrame;
     private float deadTime;
 
@@ -100,8 +100,9 @@ public class Human extends ScreenEntity {
         isFacingLeft = vel.getX() < 0;
     }
 
-    private void die() {
+    protected void die() {
         isDead = true;
+        notifyScreen(Notifications.HUMAN_DIED);
         ((GameScreen)screen).getHumans().removeValue(this, true);
         deadTime = 2;
     }

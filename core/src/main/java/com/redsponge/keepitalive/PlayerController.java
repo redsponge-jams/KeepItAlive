@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.FrameBuffer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
@@ -55,6 +56,7 @@ public class PlayerController implements Disposable {
 
     private Texture syringeStraight;
     private Texture takeoverArrow;
+    private Texture target;
     private float x;
 
     public PlayerController(GameScreen screen) {
@@ -71,6 +73,7 @@ public class PlayerController implements Disposable {
         syringe = new TextureRegion(screen.getAssets().get("syringe", Texture.class));
         syringeStraight = screen.getAssets().get("syringeStraight", Texture.class);
         takeoverArrow = screen.getAssets().get("takeoverArrow", Texture.class);
+        target = screen.getAssets().get("target", Texture.class);
 
         syringeMaskTexture = new Texture(syringeMask);
         syringeMaskRegion = new TextureRegion(syringeMaskTexture);
@@ -232,24 +235,22 @@ public class PlayerController implements Disposable {
         if(isControllingDoctor && !screen.isMoving()) {
             renderSyringes(batch);
         }
+        if(controlled != null) {
+            renderer.begin(ShapeType.Filled);
+            renderer.setColor(Color.BLACK);
+            renderer.rect(pos.getX(), pos.getY() + size.getY() + 1+1, size.getX(), 3);
+            float prog = controlled.hp / controlled.maxHp;
+            renderer.setColor(Color.GREEN);
+            renderer.rect(pos.getX() + 1, pos.getY() + size.getY() + 2+1, prog * (size.getX() - 2), 1);
+            renderer.end();
+        }
         if (!isChoosingTargets) return;
 
-        renderer.begin(ShapeRenderer.ShapeType.Line);
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        renderer.begin(ShapeType.Filled);
         renderer.setColor(Color.RED);
-        for (int i = 0; i < targets.size; i++) {
-            PositionComponent pos = Mappers.position.get(targets.get(i));
-            SizeComponent size = Mappers.size.get(targets.get(i));
-            renderer.rect(pos.getX(), pos.getY(), size.getX(), size.getY());
-            if (i == currentInterestingTarget) {
-                renderer.setColor(Color.GREEN);
-                renderer.setAutoShapeType(true);
-                renderer.set(ShapeRenderer.ShapeType.Filled);
-                renderer.circle(pos.getX() + size.getX() / 2f, pos.getY() + size.getY() / 2f, 4);
-                renderer.setColor(Color.RED);
-                renderer.set(ShapeRenderer.ShapeType.Line);
-            }
-        }
-        renderer.circle(pos.getX() + size.getX() / 2f, pos.getY() + size.getY() / 2f, checkRadius);
+        renderer.getColor().a = 0.2f;
+        renderer.circle(pos.getX() + size.getX() / 2f, pos.getY() + size.getY() / 2f, checkRadius, 300);
         if(targets.size > 0) {
             renderer.set(ShapeRenderer.ShapeType.Filled);
             PositionComponent targetPos = Mappers.position.get(targets.get(currentInterestingTarget));
@@ -257,6 +258,17 @@ public class PlayerController implements Disposable {
             renderer.rectLine(pos.getX() + size.getX() / 2f, pos.getY() + size.getY() / 2f, targetPos.getX() + targetSize.getX() / 2f, targetPos.getY() + targetSize.getY() / 2f, 2, new Color(0, 0.5f, 0, 1.0f), Color.GREEN);
         }
         renderer.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        if(targets.size > 0) {
+            Human h = targets.get(currentInterestingTarget);
+            PositionComponent targetPos = Mappers.position.get(h);
+            batch.setProjectionMatrix(screen.getRenderSystem().getViewport().getCamera().combined);
+            batch.begin();
+            batch.setColor(Color.GREEN);
+            batch.draw(target, targetPos.getX(), targetPos.getY());
+            batch.end();
+        }
 
         float rotation = 0;
         if(targets.size > 0) {
