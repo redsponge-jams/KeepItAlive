@@ -34,6 +34,8 @@ public class Human extends ScreenEntity {
     protected boolean isFacingLeft;
     private TextureRegion deathFrame;
     private float deadTime;
+    private float downSpeed;
+    private float upSpeed;
 
     public Human(SpriteBatch batch, ShapeRenderer shapeRenderer, int spawnX, int spawnY) {
         super(batch, shapeRenderer);
@@ -41,6 +43,8 @@ public class Human extends ScreenEntity {
         this.spawnY = spawnY;
         wantedPos = new IntVector2();
         hp = maxHp;
+        downSpeed = 1;
+        upSpeed = 1;
     }
 
     @Override
@@ -61,7 +65,7 @@ public class Human extends ScreenEntity {
     }
 
     protected void generatePos() {
-        wantedPos.set((int) MathUtils.random(((GameScreen)screen).getGameWidth()), MathUtils.random(((GameScreen) screen).getGameHeight()));
+        wantedPos.set((int) MathUtils.random(((SizableScreen)screen).getGameWidth()), (int) MathUtils.random(((SizableScreen) screen).getGameHeight()));
     }
 
     @Override
@@ -82,10 +86,10 @@ public class Human extends ScreenEntity {
             if(vel.getX() != 0) {
                 isFacingLeft = vel.getX() < 0;
             }
-            hp -= delta;
+            hp -= delta * downSpeed;
             return;
         } else {
-            hp += delta / 2f;
+            hp += upSpeed * delta / 2f;
             if(hp > maxHp) {
                 hp = maxHp;
             }
@@ -103,7 +107,7 @@ public class Human extends ScreenEntity {
     protected void die() {
         isDead = true;
         notifyScreen(Notifications.HUMAN_DIED);
-        ((GameScreen)screen).getHumans().removeValue(this, true);
+        ((GameableScreen)screen).getHumans().removeValue(this, true);
         deadTime = 2;
     }
 
@@ -196,6 +200,14 @@ public class Human extends ScreenEntity {
 
     @Override
     public void removed() {
-        ((GameScreen)screen).getHumans().removeValue(this, true);
+        ((GameableScreen)screen).getHumans().removeValue(this, true);
+    }
+
+    public void setHPGoDownSpeed(float speed) {
+        this.downSpeed = speed;
+    }
+
+    public void setHPGoUpSpeed(float goUpSpeed) {
+        this.upSpeed = goUpSpeed;
     }
 }

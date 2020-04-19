@@ -1,6 +1,7 @@
 package com.redsponge.keepitalive;
 
 import com.badlogic.gdx.assets.AssetManager;
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.Animation.PlayMode;
@@ -57,4 +58,19 @@ public class GameAssets extends AssetSpecifier {
 
     @Asset("game/target.png")
     private Texture target;
+
+    @Asset("game/tutorial_stone.png")
+    private Texture stone;
+
+    @Asset("sounds/change_body.ogg")
+    private Sound changeBodySound;
+
+    @Asset("sounds/whoosh.ogg")
+    private Sound whooshSound;
+
+    @Asset("sounds/used_syringe.ogg")
+    private Sound usedSyringeSound;
+
+    @Asset("sounds/loseSound.ogg")
+    private Sound loseSound;
 }

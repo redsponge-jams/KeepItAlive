@@ -82,7 +82,7 @@ public class Doctor extends Human {
     }
 
     private void tryFindNeedHelp() {
-        Array<Human> humans = ((GameScreen)screen).getHumans();
+        Array<Human> humans = ((GameableScreen)screen).getHumans();
         if(wantToHelp != null) {
             takenHumans.removeValue(wantToHelp, true);
         }
@@ -92,7 +92,7 @@ public class Doctor extends Human {
             if(humans.get(i).isControlled) {
                 PositionComponent pos = Mappers.position.get(humans.get(i));
 
-                if(Vector2.dst2(this.pos.getX(), this.pos.getY(), pos.getX(), pos.getY()) < 50*50) {
+                if(Vector2.dst2(this.pos.getX(), this.pos.getY(), pos.getX(), pos.getY()) < 100 * 100) {
                     continue;
                 }
             }
@@ -126,6 +126,7 @@ public class Doctor extends Human {
 
     @Override
     public void additionalRender() {
+
         if(wantToHelp != null) {
             Gdx.gl.glEnable(GL20.GL_BLEND);
             Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);

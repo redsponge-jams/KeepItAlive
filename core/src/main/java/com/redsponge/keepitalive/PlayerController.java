@@ -2,6 +2,7 @@ package com.redsponge.keepitalive;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -16,7 +17,6 @@ import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.Scaling;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.ScalingViewport;
-import com.redsponge.redengine.screen.INotified;
 import com.redsponge.redengine.screen.components.Mappers;
 import com.redsponge.redengine.screen.components.PositionComponent;
 import com.redsponge.redengine.screen.components.SizeComponent;
@@ -34,7 +34,7 @@ public class PlayerController implements Disposable {
 
     private final Array<Human> targets;
     private boolean isChoosingTargets;
-    private final GameScreen screen;
+    private final GameableScreen screen;
     private Vector2 controlledCenter;
     private Vector2 tmp;
     private int currentInterestingTarget;
@@ -59,7 +59,11 @@ public class PlayerController implements Disposable {
     private Texture target;
     private float x;
 
-    public PlayerController(GameScreen screen) {
+    private Sound changeBodySound;
+    private Sound whooshSound;
+    private Sound usedSyringeSound;
+
+    public PlayerController(GameableScreen screen) {
         this.screen = screen;
         targets = new Array<>();
         syringeArea = new FrameBuffer(Pixmap.Format.RGBA8888, 16 * 3, 16, false);
@@ -74,6 +78,9 @@ public class PlayerController implements Disposable {
         syringeStraight = screen.getAssets().get("syringeStraight", Texture.class);
         takeoverArrow = screen.getAssets().get("takeoverArrow", Texture.class);
         target = screen.getAssets().get("target", Texture.class);
+        changeBodySound = screen.getAssets().get("changeBodySound", Sound.class);
+        whooshSound = screen.getAssets().get("whooshSound", Sound.class);
+        usedSyringeSound = screen.getAssets().get("usedSyringeSound", Sound.class);
 
         syringeMaskTexture = new Texture(syringeMask);
         syringeMaskRegion = new TextureRegion(syringeMaskTexture);
@@ -102,6 +109,8 @@ public class PlayerController implements Disposable {
 
             this.controlledCenter = new Vector2();
             this.tmp = new Vector2();
+            whooshSound.play();
+            screen.getPM().star().spawn(pos.getX() + size.getX() / 2f, pos.getY() + size.getY() / 2f);
         }
     }
 
@@ -109,9 +118,11 @@ public class PlayerController implements Disposable {
     public void tick(float delta) {
         x += delta * 360;
         if(delta == 0) return;
-        if(controlled.isDead()) {
-            screen.notified(this, Notifications.HOST_DIED);
-            return;
+        if(controlled != null) {
+            if (controlled.isDead()) {
+                screen.notified(this, Notifications.HOST_DIED);
+                return;
+            }
         }
 
 
@@ -136,6 +147,7 @@ public class PlayerController implements Disposable {
                         }
 
                         screen.beginMoveAnimation(controlled, targets.get(currentInterestingTarget));
+                        changeBodySound.play();
                         setControlled(null);
                     }
                     releaseTargets();
@@ -145,6 +157,7 @@ public class PlayerController implements Disposable {
                     if(targets.size > 0) {
                         targets.get(currentInterestingTarget).injectBad();
                         ((Doctor) controlled).syringes--;
+                        usedSyringeSound.play();
                     }
                     releaseTargets();
                 } else if(!isControllingDoctor) {
@@ -294,7 +307,8 @@ public class PlayerController implements Disposable {
         isChoosingTargets = true;
         controlledCenter.set(pos.getX() + size.getX() / 2f, pos.getY() + size.getY() / 2f);
 
-        for (Human h : screen.getHumans()) {
+        for (int i = 0; i < screen.getHumans().size; i++) {
+            Human h = screen.getHumans().get(i);
             if (h == controlled) continue;
 
             PositionComponent humanPos = Mappers.position.get(h);

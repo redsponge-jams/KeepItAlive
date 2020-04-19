@@ -6,6 +6,6 @@ public class KeepitAlive extends EngineGame {
 
     @Override
     public void init() {
-        setScreen(new GameScreen(ga));
+        setScreen(new TutorialScreen(ga));
     }
 }

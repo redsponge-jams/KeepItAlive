@@ -9,11 +9,15 @@ import com.redsponge.redengine.screen.entity.ScreenEntity;
 
 public class Background extends ScreenEntity {
 
-
     private Texture grass;
 
     public Background(SpriteBatch batch, ShapeRenderer shapeRenderer) {
         super(batch, shapeRenderer);
+    }
+
+    public Background(SpriteBatch batch, ShapeRenderer shapeRenderer, Texture grass) {
+        super(batch, shapeRenderer);
+        this.grass = grass;
     }
 
     @Override
@@ -24,12 +28,15 @@ public class Background extends ScreenEntity {
 
     @Override
     public void loadAssets() {
-        grass = assets.get("grass", Texture.class);
+        if(grass == null) {
+            grass = assets.get("grass", Texture.class);
+        }
     }
 
     private void render() {
-        for (int i = 0; i < ((GameScreen) screen).getGameHeight(); i+=16) {
-            for (int j = 0; j < ((GameScreen) screen).getGameWidth(); j+=16) {
+        batch.setColor(Color.WHITE);
+        for (int i = 0; i < ((SizableScreen) screen).getGameHeight(); i+=16) {
+            for (int j = 0; j < ((SizableScreen) screen).getGameWidth(); j+=16) {
                 batch.draw(grass, j, i);
             }
         }
