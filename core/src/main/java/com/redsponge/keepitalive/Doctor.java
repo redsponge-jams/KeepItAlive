@@ -155,18 +155,21 @@ public class Doctor extends Human {
             batch.draw(syringeStraight, this.pos.getX() + size.getX() / 2f - 3, this.pos.getY() + size.getY() / 2f, 3, 0, 6, syringeStraight.getHeight(), 1, 1, rotation, 0, 0, 6, syringeStraight.getHeight(), false, false);
             batch.end();
         }
-        batch.begin();
-        batch.setColor(Color.WHITE);
 
-        hatRegion.flip(!isFacingLeft, false);
-        batch.draw(hatRegion, pos.getX() + 4, pos.getY() + size.getY());
-        hatRegion.flip(!isFacingLeft, false);
+        if(!isDead()) {
+            batch.begin();
+            batch.setColor(Color.WHITE);
 
-        batch.setColor(isControlled ? Color.GREEN : Color.GOLD);
-        for(int i = 0; i < (int) syringes; i++) {
-            batch.draw(syringe, pos.getX() + 4 + i * 2, pos.getY() + size.getY() + 2, 8, 8);
+            hatRegion.flip(!isFacingLeft, false);
+            batch.draw(hatRegion, pos.getX() + 4, pos.getY() + size.getY());
+            hatRegion.flip(!isFacingLeft, false);
+
+            batch.setColor(isControlled ? Color.GREEN : Color.GOLD);
+            for (int i = 0; i < (int) syringes; i++) {
+                batch.draw(syringe, pos.getX() + 4 + i * 2, pos.getY() + size.getY() + 2, 8, 8);
+            }
+            batch.end();
         }
-        batch.end();
     }
 
     @Override

@@ -3,6 +3,7 @@ package com.redsponge.keepitalive;
 import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Animation;
+import com.badlogic.gdx.graphics.g2d.Animation.PlayMode;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.redsponge.redengine.assets.Asset;
@@ -27,7 +28,7 @@ public class GameAssets extends AssetSpecifier {
     @Asset("game/textures/game.atlas")
     private TextureAtlas gameTextures;
 
-    @AtlasAnimation(atlas = "gameTextures", animationName = "human_walk", length = 3, playMode = Animation.PlayMode.LOOP)
+    @AtlasAnimation(atlas = "gameTextures", animationName = "human_walk", length = 3, playMode = PlayMode.LOOP_PINGPONG)
     private Animation<TextureRegion> humanWalk;
 
     @AtlasAnimation(atlas = "gameTextures", animationName = "human_face", length = 5, playMode = Animation.PlayMode.NORMAL)

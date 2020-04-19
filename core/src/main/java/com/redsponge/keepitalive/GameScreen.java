@@ -22,6 +22,7 @@ import com.redsponge.redengine.render.util.ScreenFiller;
 import com.redsponge.redengine.screen.AbstractScreen;
 import com.redsponge.redengine.screen.components.Mappers;
 import com.redsponge.redengine.screen.components.PositionComponent;
+import com.redsponge.redengine.screen.components.SizeComponent;
 import com.redsponge.redengine.screen.systems.RenderSystem;
 import com.redsponge.redengine.transitions.Transitions;
 import com.redsponge.redengine.utils.GameAccessor;
@@ -56,6 +57,7 @@ public class GameScreen extends AbstractScreen {
 
     private TextureRegion humanDeathIcon;
     private Texture clockIcon;
+    private Texture straightArrow;
 
     public GameScreen(GameAccessor ga) {
         super(ga);
@@ -81,6 +83,7 @@ public class GameScreen extends AbstractScreen {
 
         warnTexture = assets.get("warnTexture", Texture.class);
         humanDeathIcon = assets.getTextureRegion("humanDead");
+        straightArrow = assets.get("takeoverArrow", Texture.class);
         clockIcon = assets.get("clock", Texture.class);
     }
 
@@ -165,16 +168,19 @@ public class GameScreen extends AbstractScreen {
         if(isMoving) {
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             PositionComponent posFrom = Mappers.position.get(moveFrom);
+            SizeComponent sizeFrom = Mappers.size.get(moveFrom);
             PositionComponent posTo = Mappers.position.get(moveTo);
             shapeRenderer.rectLine(posFrom.getX() + 8, posFrom.getY() + 8, posTo.getX() + 8, posTo.getY() + 8, 2, Color.GREEN, new Color(0, 0.5f, 0, 1.0f));
-
+            shapeRenderer.end();
             float angle = MathUtils.atan2(posFrom.getY() - posTo.getY(), posFrom.getX() - posTo.getX());
             double progress = Interpolation.exp5In.apply(moveTime) * Vector2.dst(posFrom.getX(), posFrom.getY(), posTo.getX(), posTo.getY());
             float vx = -(float) (Math.cos(angle) * progress);
             float vy = -(float) (Math.sin(angle) * progress);
-            shapeRenderer.setColor(Color.GREEN);
-            shapeRenderer.circle(posFrom.getX() + 8 + vx, posFrom.getY() + 8 + vy, 5);
-            shapeRenderer.end();
+
+            batch.begin();
+            batch.setColor(Color.GREEN);
+            batch.draw(straightArrow, posFrom.getX() + sizeFrom.getX() / 2f - 3 + vx, posFrom.getY() + sizeFrom.getY() / 2f + vy, 3, 0, 6, straightArrow.getHeight(), 1, 1, angle * MathUtils.radiansToDegrees + 90, 0, 0, 6, straightArrow.getHeight(), false, false);
+            batch.end();
         }
 
 

@@ -266,7 +266,7 @@ public class PlayerController implements Disposable {
             batch.setProjectionMatrix(screen.getRenderSystem().getViewport().getCamera().combined);
             batch.begin();
             batch.setColor(Color.GREEN);
-            batch.draw(target, targetPos.getX(), targetPos.getY());
+            batch.draw(target, targetPos.getX() + 4, targetPos.getY() + 4, target.getWidth() / 2f, target.getHeight() / 2f);
             batch.end();
         }
 
