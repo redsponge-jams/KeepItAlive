@@ -1,0 +1,23 @@
+apply plugin: 'application'
+
+mainClassName = 'com.redsponge.keepitalive.texturepacker.PackTextures'
+eclipse.project.name = appName + '-texture-packer'
+sourceCompatibility = 8.0
+
+dependencies {
+    api project(':core')
+    api "com.badlogicgames.gdx:gdx-backend-lwjgl:$gdxVersion"
+    api "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
+}
+
+jar {
+    archiveFileName = "${appName}-${version}.jar"
+    from { configurations.compileClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    manifest {
+        attributes 'Main-Class': project.mainClassName
+    }
+}
+
+run {
+    ignoreExitValue = true
+}

@@ -20,11 +20,9 @@ import com.redsponge.redengine.screen.components.Mappers;
 import com.redsponge.redengine.screen.components.PositionComponent;
 import com.redsponge.redengine.screen.components.SizeComponent;
 import com.redsponge.redengine.screen.components.VelocityComponent;
-import com.redsponge.redengine.utils.GeneralUtils;
-import com.redsponge.redengine.utils.Logger;
 import com.redsponge.redengine.utils.MathUtilities;
 
-public class PlayerController implements INotified, Disposable {
+public class PlayerController implements Disposable {
 
     private Human controlled;
     private VelocityComponent vel;
@@ -47,10 +45,17 @@ public class PlayerController implements INotified, Disposable {
     private final TextureRegion syringeAreaRegion;
     private final Pixmap syringeMask;
 
+    private final Texture syringeMaskTexture;
+    private final TextureRegion syringeMaskRegion;
+
     private ScalingViewport syringeViewport;
 
     private FitViewport guiViewport;
     private float checkRadius;
+
+    private Texture syringeStraight;
+    private Texture takeoverArrow;
+    private float x;
 
     public PlayerController(GameScreen screen) {
         this.screen = screen;
@@ -64,7 +69,19 @@ public class PlayerController implements INotified, Disposable {
         syringeArea.getColorBufferTexture().setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
 
         syringe = new TextureRegion(screen.getAssets().get("syringe", Texture.class));
-        guiViewport = new FitViewport(screen.getScreenWidth(), screen.getScreenHeight());
+        syringeStraight = screen.getAssets().get("syringeStraight", Texture.class);
+        takeoverArrow = screen.getAssets().get("takeoverArrow", Texture.class);
+
+        syringeMaskTexture = new Texture(syringeMask);
+        syringeMaskRegion = new TextureRegion(syringeMaskTexture);
+        syringeMaskRegion.flip(false, true);
+    }
+
+    private float getAngleRelativeToSelf(Human h) {
+        PositionComponent hPos = Mappers.position.get(h);
+        SizeComponent hSize = Mappers.size.get(h);
+        double angle = MathUtils.atan2(pos.getY() + size.getY() / 2f - hPos.getY() - hSize.getY() / 2f, pos.getX() + size.getX() / 2f - hPos.getX() - hSize.getX() / 2f);
+        return (float) angle;
     }
 
     public void setControlled(Human controlled) {
@@ -73,29 +90,24 @@ public class PlayerController implements INotified, Disposable {
             this.controlled.virusLeft();
         }
         this.controlled = controlled;
-        this.isControllingDoctor = controlled instanceof Doctor;
-        this.controlled.setControlled(true);
-        this.vel = Mappers.velocity.get(controlled);
-        this.pos = Mappers.position.get(controlled);
-        this.size = Mappers.size.get(controlled);
+        if(controlled != null) {
+            this.isControllingDoctor = controlled instanceof Doctor;
+            this.controlled.setControlled(true);
+            this.vel = Mappers.velocity.get(controlled);
+            this.pos = Mappers.position.get(controlled);
+            this.size = Mappers.size.get(controlled);
 
-        this.controlledCenter = new Vector2();
-        this.tmp = new Vector2();
-    }
-
-    @Override
-    public void notified(Object o, int i) {
-        if(i == Notifications.CONTROLLED_HEALED) {
-            if(o == controlled) {
-                screen.notified(this, Notifications.LOST);
-            }
+            this.controlledCenter = new Vector2();
+            this.tmp = new Vector2();
         }
     }
 
+
     public void tick(float delta) {
+        x += delta * 360;
+        if(delta == 0) return;
         if(controlled.isDead()) {
-            Logger.log(this, "CONTROLLED DEAD :(");
-            screen.notified(this, Notifications.LOST);
+            screen.notified(this, Notifications.HOST_DIED);
             return;
         }
 
@@ -103,7 +115,7 @@ public class PlayerController implements INotified, Disposable {
         if (isChoosingTargets) {
             checkRadius = MathUtilities.lerp(checkRadius, 50, 0.1f);
             vel.set(0, 0);
-            generateTargets(!isChoosingForTakeover);
+            generateTargets(!isChoosingForTakeover, true);
             int horiz = (Gdx.input.isKeyJustPressed(Input.Keys.RIGHT) ? 1 : 0) - (Gdx.input.isKeyJustPressed(Input.Keys.LEFT) ? 1 : 0);
             currentInterestingTarget += horiz;
             if(currentInterestingTarget >= targets.size) {
@@ -120,14 +132,17 @@ public class PlayerController implements INotified, Disposable {
                             return;
                         }
 
-                        setControlled(targets.get(currentInterestingTarget));
-                        releaseTargets();
+                        screen.beginMoveAnimation(controlled, targets.get(currentInterestingTarget));
+                        setControlled(null);
                     }
+                    releaseTargets();
                 }
             } else {
                 if (isControllingDoctor && !Gdx.input.isKeyPressed(Input.Keys.X)) {
-                    targets.get(currentInterestingTarget).injectBad();
-                    ((Doctor)controlled).syringes--;
+                    if(targets.size > 0) {
+                        targets.get(currentInterestingTarget).injectBad();
+                        ((Doctor) controlled).syringes--;
+                    }
                     releaseTargets();
                 } else if(!isControllingDoctor) {
                     releaseTargets();
@@ -146,10 +161,10 @@ public class PlayerController implements INotified, Disposable {
             this.vel.setY(vert * speed);
 
             if (Gdx.input.isKeyJustPressed(Input.Keys.Z)) {
-                generateTargets(false);
+                generateTargets(false, false);
                 isChoosingForTakeover = true;
             } else if(isControllingDoctor && Gdx.input.isKeyJustPressed(Input.Keys.X) && ((Doctor)controlled).syringes >= 1) {
-                generateTargets(true);
+                generateTargets(true, false);
                 isChoosingForTakeover = false;
             }
         }
@@ -197,12 +212,10 @@ public class PlayerController implements INotified, Disposable {
             tmp--;
             i++;
         }
-        TextureRegion reg = new TextureRegion(new Texture(syringeMask));
-        reg.flip(false, true);
+        syringeMaskTexture.draw(syringeMask, 0, 0);
 
-//        batch.enableBlending();
         batch.setBlendFunction(GL20.GL_ZERO, GL20.GL_SRC_ALPHA);
-        batch.draw(reg, 0, 0, syringeArea.getWidth(), syringeArea.getHeight());
+        batch.draw(syringeMaskRegion, 0, 0, syringeArea.getWidth(), syringeArea.getHeight());
         batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         batch.end();
 
@@ -215,10 +228,10 @@ public class PlayerController implements INotified, Disposable {
     }
 
     public void render(SpriteBatch batch, ShapeRenderer renderer) {
-        if(isControllingDoctor) {
+        if(screen.isPlayerDead()) return;
+        if(isControllingDoctor && !screen.isMoving()) {
             renderSyringes(batch);
         }
-
         if (!isChoosingTargets) return;
 
         renderer.begin(ShapeRenderer.ShapeType.Line);
@@ -237,10 +250,34 @@ public class PlayerController implements INotified, Disposable {
             }
         }
         renderer.circle(pos.getX() + size.getX() / 2f, pos.getY() + size.getY() / 2f, checkRadius);
+        if(targets.size > 0) {
+            renderer.set(ShapeRenderer.ShapeType.Filled);
+            PositionComponent targetPos = Mappers.position.get(targets.get(currentInterestingTarget));
+            SizeComponent targetSize = Mappers.size.get(targets.get(currentInterestingTarget));
+            renderer.rectLine(pos.getX() + size.getX() / 2f, pos.getY() + size.getY() / 2f, targetPos.getX() + targetSize.getX() / 2f, targetPos.getY() + targetSize.getY() / 2f, 2, new Color(0, 0.5f, 0, 1.0f), Color.GREEN);
+        }
         renderer.end();
+
+        float rotation = 0;
+        if(targets.size > 0) {
+            rotation = getAngleRelativeToSelf(targets.get(currentInterestingTarget)) * MathUtils.radiansToDegrees;
+            rotation = rotation + 90;
+        }
+        Texture tex = isChoosingForTakeover ? takeoverArrow : syringeStraight;
+        screen.getRenderSystem().getViewport().apply();
+        batch.setProjectionMatrix(screen.getRenderSystem().getViewport().getCamera().combined);
+        batch.begin();
+        batch.setColor(Color.GREEN);
+        batch.draw(tex, pos.getX() + size.getX() / 2f - 3, pos.getY() + size.getY() / 2f, 3, 0, 6, tex.getHeight(), 1, 1, rotation, 0, 0, 6, tex.getHeight(), false, false);
+        batch.end();
     }
 
-    private void generateTargets(boolean includeProtected) {
+    private void generateTargets(boolean includeProtected, boolean update) {
+        Human targetedBefore = null;
+        if(update && targets.size > 0) {
+            targetedBefore = targets.get(currentInterestingTarget);
+        }
+
         targets.clear();
         isChoosingTargets = true;
         controlledCenter.set(pos.getX() + size.getX() / 2f, pos.getY() + size.getY() / 2f);
@@ -257,10 +294,20 @@ public class PlayerController implements INotified, Disposable {
                 }
             }
         }
-        targets.sort((h1, h2) -> (int) (Mappers.position.get(h2).getX() - Mappers.position.get(h1).getX()));
-        if (targets.isEmpty() && checkRadius > 40) {
-            isChoosingTargets = false;
-            Logger.log(this, "Couldn't find any targets!");
+        targets.sort((h1, h2) -> {
+            float h1Angle = getAngleRelativeToSelf(h1);
+            float h2Angle = getAngleRelativeToSelf(h2);
+            return (int) (h1Angle - h2Angle);
+        });
+        if(update) {
+            for (int i = 0; i < targets.size; i++) {
+                if(targets.get(i) == targetedBefore) {
+                    currentInterestingTarget = i;
+                    break;
+                }
+            }
+        } else {
+            currentInterestingTarget = 0;
         }
     }
 
@@ -287,5 +334,9 @@ public class PlayerController implements INotified, Disposable {
 
     public boolean isChoosingTarget() {
         return isChoosingTargets;
+    }
+
+    public Human getControlled() {
+        return controlled;
     }
 }

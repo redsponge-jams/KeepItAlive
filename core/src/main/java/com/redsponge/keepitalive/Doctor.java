@@ -6,7 +6,6 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.DelayedRemovalArray;
-import com.redsponge.redengine.assets.Fonts;
 import com.redsponge.redengine.screen.components.Mappers;
 import com.redsponge.redengine.screen.components.PositionComponent;
 import com.redsponge.redengine.screen.components.SizeComponent;
@@ -24,17 +23,11 @@ public class Doctor extends Human {
 
     private static final DelayedRemovalArray<Human> takenHumans = new DelayedRemovalArray<>();
 
-    public Doctor(SpriteBatch batch, ShapeRenderer shapeRenderer) {
-        super(batch, shapeRenderer);
+    public Doctor(SpriteBatch batch, ShapeRenderer shapeRenderer, int spawnX, int spawnY) {
+        super(batch, shapeRenderer, spawnX, spawnY);
         speed = 50;
-        maxHp = 5;
-        hp = 5;
-    }
-
-    @Override
-    public void added() {
-        super.added();
-        pos.set(200, 100);
+        maxHp = 10;
+        hp = maxHp;
     }
 
     @Override
@@ -50,8 +43,9 @@ public class Doctor extends Human {
             takenHumans.removeValue(wantToHelp, true);
             syringes--;
             wantToHelp = null;
+            timeUntilNextHelp = 3;
         }
-        if(syringes >= 1) {
+        if(syringes >= 1 && timeUntilNextHelp <= 0) {
             tryFindNeedHelp();
         }
         if (wantToHelp == null) {
@@ -61,13 +55,16 @@ public class Doctor extends Human {
 
     @Override
     public void additionalTick(float delta) {
-        if(!controlled) {
-            syringes += delta / 2f;
-            if(syringes > 3) syringes = 3;
-        }
+        if(!isDead()) {
+            timeUntilNextHelp -= delta;
+            if (!isControlled) {
+                syringes += delta / 2f;
+                if (syringes > 3) syringes = 3;
+            }
 
-        if(wantToHelp != null) {
-            wantedPos.set((int) (helpPos.getX() + helpSize.getX() / 2), (int) (helpPos.getY() + helpSize.getY()/ 2f));
+            if (wantToHelp != null) {
+                wantedPos.set((int) (helpPos.getX() + helpSize.getX() / 2), (int) (helpPos.getY() + helpSize.getY() / 2f));
+            }
         }
         super.additionalTick(delta);
     }
@@ -108,9 +105,9 @@ public class Doctor extends Human {
         shapeRenderer.rect(pos.getX() + 2, pos.getY() + size.getY() - 1, 4, 3);
         shapeRenderer.end();
         batch.begin();
-        batch.setColor(controlled ? Color.GREEN : Color.GOLD);
+        batch.setColor(isControlled ? Color.GREEN : Color.GOLD);
         for(int i = 0; i < (int) syringes; i++) {
-            batch.draw(syringe, pos.getX() + i * 2, pos.getY() + size.getY() + 2, 8, 8);
+            batch.draw(syringe, pos.getX() + 4 + i * 2, pos.getY() + size.getY() + 2, 8, 8);
         }
         batch.end();
     }
